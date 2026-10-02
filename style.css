@@ -68,6 +68,9 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .build-button:hover { transform: translateY(-1px); background: #1b4a39; }
 .build-button b { font-size: 17px; font-weight: 400; }
 .build-button:disabled { transform: none; cursor: not-allowed; opacity: .54; }
+.animation-button { width: 100%; min-height: 39px; margin-top: 8px; border: 1px solid #d5e2d1; border-radius: 10px; background: #eef4eb; color: #47674c; cursor: pointer; font-size: 12px; font-weight: 650; transition: background .15s, border-color .15s, color .15s; }
+.animation-button:hover { background: #e5efe1; }
+.animation-button.running { border-color: #dca57a; background: #fff5ec; color: #8a563b; }
 .reset-button, .example-button { border: 1px solid var(--line); background: white; color: #4c5a50; font-size: 12px; }
 .reset-button:hover, .example-button:hover { background: #f4f6f0; }
 .message { min-height: 36px; margin: 13px 0 0; color: #627066; font-size: 11px; line-height: 1.65; }
@@ -98,6 +101,11 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .node.visited text { fill: #294832; }
 .node.current-visit circle { fill: var(--orange); stroke: #b86b3a; stroke-width: 3; }
 .node.current-visit text { fill: white; }
+.node .visit-badge { pointer-events: none; }
+.node .visit-badge circle { fill: #fffefa; stroke: #76916f; stroke-width: 1.5; filter: drop-shadow(0 1px 2px #2e48302a); }
+.node .visit-badge text { fill: #35543a; font: 700 8px var(--mono); }
+.node.current-visit .visit-badge circle { fill: #fff8ed; stroke: #a65d35; }
+.node.current-visit .visit-badge text { fill: #8c4b29; }
 .node { animation: appear .35s cubic-bezier(.2,.8,.2,1) both; transform-box: fill-box; transform-origin: center; }
 .nodes .node:nth-child(2) { animation-delay: .04s; }.nodes .node:nth-child(3) { animation-delay: .08s; }.nodes .node:nth-child(4) { animation-delay: .12s; }.nodes .node:nth-child(5) { animation-delay: .16s; }
 .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); text-align: center; }
