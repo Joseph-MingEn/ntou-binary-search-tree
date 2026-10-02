@@ -71,6 +71,11 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .animation-button { width: 100%; min-height: 39px; margin-top: 8px; border: 1px solid #d5e2d1; border-radius: 10px; background: #eef4eb; color: #47674c; cursor: pointer; font-size: 12px; font-weight: 650; transition: background .15s, border-color .15s, color .15s; }
 .animation-button:hover { background: #e5efe1; }
 .animation-button.running { border-color: #dca57a; background: #fff5ec; color: #8a563b; }
+.speed-control { margin-top: 12px; }
+.speed-control label { display: flex; align-items: center; justify-content: space-between; margin: 0 1px 7px; color: #414c44; font-size: 11px; font-weight: 650; }
+.speed-control output { color: var(--muted); font: 10px var(--mono); font-weight: 400; }
+.speed-control input { display: block; width: 100%; height: 16px; margin: 0; accent-color: var(--green); cursor: pointer; }
+.speed-range-labels { display: flex; justify-content: space-between; margin: 1px 1px 0; color: var(--soft); font-size: 9px; }
 .reset-button, .example-button { border: 1px solid var(--line); background: white; color: #4c5a50; font-size: 12px; }
 .reset-button:hover, .example-button:hover { background: #f4f6f0; }
 .message { min-height: 36px; margin: 13px 0 0; color: #627066; font-size: 11px; line-height: 1.65; }
@@ -91,6 +96,7 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .tree-stage { position: relative; min-height: 320px; margin-top: 18px; overflow: auto hidden; border: 1px solid #eeede5; border-radius: 14px; background-color: #fbfaf5; background-image: radial-gradient(#d7ddd3 0.8px, transparent .8px); background-size: 20px 20px; scrollbar-color: #bec9bb transparent; scrollbar-width: thin; }
 #treeSvg { display: block; margin: 0 auto; overflow: visible; }
 #treeSvg[hidden] { display: none; }
+#treeSvg.animating .node { animation: none; opacity: 1; }
 .edge { fill: none; stroke-width: 2; stroke-linecap: round; }
 .edge-left { stroke: #7c9a78; }.edge-right { stroke: #d4a079; }
 .node circle { fill: #fffefa; stroke: #a9b8a2; stroke-width: 2; filter: drop-shadow(0 3px 4px #2e48301a); }
