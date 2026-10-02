@@ -6,6 +6,9 @@ const svg = document.querySelector('#treeSvg');
 const stage = document.querySelector('#treeStage');
 const emptyState = document.querySelector('#emptyState');
 const message = document.querySelector('#message');
+const modeNote = document.querySelector('#modeNote');
+const modeButtons = [...document.querySelectorAll('[data-mode]')];
+const nextButtonLabel = document.querySelector('#nextButtonLabel');
 const nodeCount = document.querySelector('#nodeCount');
 const treeHeight = document.querySelector('#treeHeight');
 const stepCount = document.querySelector('#stepCount');
@@ -17,6 +20,10 @@ const Y_GAP = 82;
 let activeValues = null;
 let insertedCount = 0;
 let root = null;
+let mode = 'general';
+let traversalOrder = [];
+let traversalIndex = 0;
+const modeLabels = { preorder: '前序', inorder: '中序', postorder: '後序' };
 
 function parseSequence(value) {
   const parts = value.trim().split(/[\s,，、]+/).filter(Boolean);
@@ -76,7 +83,7 @@ function svgElement(name, attributes = {}) {
   return element;
 }
 
-function drawTree(root) {
+function drawTree(root, visitedNodes = [], currentNode = null) {
   svg.replaceChildren();
   if (!root) {
     svg.hidden = true;
@@ -115,11 +122,18 @@ function drawTree(root) {
   svg.append(edges);
 
   const nodes = svgElement('g', { class: 'nodes' });
+  const visited = new Set(visitedNodes);
   points.forEach(({ node, x, y }) => {
     const cx = x + offsetX;
-    const group = svgElement('g', { class: `node ${node === root ? 'root-node' : ''}`, transform: `translate(${cx} ${y})` });
+    const classes = ['node'];
+    if (node === root) classes.push('root-node');
+    if (visited.has(node)) classes.push('visited');
+    if (node === currentNode) classes.push('current-visit');
+    const group = svgElement('g', { class: classes.join(' '), transform: `translate(${cx} ${y})` });
     const title = svgElement('title');
-    title.textContent = `${node.value}，${node === root ? '根節點' : '第 ' + (node.depth + 1) + ' 層'}`;
+    const visitPosition = traversalOrder.indexOf(node);
+    const visitHint = mode !== 'general' && visitPosition >= 0 ? `，${modeLabels[mode]}遍歷第 ${visitPosition + 1} 個` : '';
+    title.textContent = `${node.value}，${node === root ? '根節點' : '第 ' + (node.depth + 1) + ' 層'}${visitHint}`;
     const circle = svgElement('circle', { r: NODE_RADIUS });
     const label = svgElement('text', { 'text-anchor': 'middle', dy: '0.36em' });
     label.textContent = node.value;
@@ -137,6 +151,12 @@ function sameSequence(values) {
 }
 
 function updateProgress() {
+  if (mode !== 'general') {
+    const total = traversalOrder.length;
+    stepCount.textContent = `${traversalIndex} / ${total}`;
+    nextButton.disabled = !root || traversalIndex >= total;
+    return;
+  }
   const parsed = parseSequence(input.value);
   if (parsed.error) {
     stepCount.textContent = `${insertedCount} / —`;
@@ -173,6 +193,8 @@ function addNextNumber() {
   root = insert(root, value);
   insertedCount += 1;
   drawTree(root);
+  traversalOrder = [];
+  traversalIndex = 0;
   message.textContent = `已新增第 ${insertedCount} / ${activeValues.length} 個數字：${value}。`;
   if (insertedCount === activeValues.length) message.textContent += ' 數列插入完成。';
   message.className = 'message success';
@@ -183,17 +205,95 @@ function resetTree() {
   root = null;
   activeValues = null;
   insertedCount = 0;
+  traversalOrder = [];
+  traversalIndex = 0;
   input.setAttribute('aria-invalid', 'false');
   drawTree(null);
-  message.textContent = '已重置；按「下一數字」從目前數列的第一個數字開始。';
+  message.textContent = mode === 'general'
+    ? '已重置；按「下一數字」從目前數列的第一個數字開始。'
+    : '樹已清空；請切回一般模式逐個插入數字。';
   message.className = 'message';
   updateProgress();
 }
 
-nextButton.addEventListener('click', addNextNumber);
-resetButton.addEventListener('click', resetTree);
+function getTraversal(node, order, values = []) {
+  if (!node) return values;
+  if (order === 'preorder') values.push(node);
+  getTraversal(node.left, order, values);
+  if (order === 'inorder') values.push(node);
+  getTraversal(node.right, order, values);
+  if (order === 'postorder') values.push(node);
+  return values;
+}
+
+function renderTraversal() {
+  const visited = traversalOrder.slice(0, traversalIndex);
+  drawTree(root, visited, visited[visited.length - 1] ?? null);
+}
+
+function updateModeControls() {
+  modeButtons.forEach((button) => {
+    const selected = button.dataset.mode === mode;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  const isTraversal = mode !== 'general';
+  nextButtonLabel.textContent = isTraversal ? '下一步' : '下一數字';
+  modeNote.textContent = isTraversal
+    ? `${modeLabels[mode]}遍歷：依序標示拜訪到的節點。`
+    : '逐個插入數字，建立二元搜尋樹。';
+  updateProgress();
+}
+
+function changeMode(nextMode) {
+  mode = nextMode;
+  traversalIndex = 0;
+  traversalOrder = mode === 'general' ? [] : getTraversal(root, mode);
+  updateModeControls();
+  if (mode !== 'general') renderTraversal();
+  else drawTree(root);
+  if (mode === 'general') {
+    message.textContent = root ? '已切回一般模式，按「下一數字」繼續插入。' : '一般模式：按「下一數字」逐個建立二元搜尋樹。';
+  } else if (!root) {
+    message.textContent = `已切換到${modeLabels[mode]}遍歷；請先切回一般模式建立樹。`;
+  } else {
+    message.textContent = `已切換到${modeLabels[mode]}遍歷，按「下一步」開始。`;
+  }
+  message.className = 'message';
+}
+
+function visitNextNode() {
+  if (!root) {
+    message.textContent = '請先切回一般模式，插入數字並建立樹。';
+    message.className = 'message error';
+    return;
+  }
+  if (!traversalOrder.length) traversalOrder = getTraversal(root, mode);
+  if (traversalIndex >= traversalOrder.length) return;
+  const node = traversalOrder[traversalIndex];
+  traversalIndex += 1;
+  renderTraversal();
+  message.textContent = `${modeLabels[mode]}遍歷第 ${traversalIndex} / ${traversalOrder.length} 步：${node.value}。`;
+  if (traversalIndex === traversalOrder.length) message.textContent += ' 遍歷完成。';
+  message.className = 'message success';
+  updateProgress();
+}
+
+function resetTraversal() {
+  traversalIndex = 0;
+  if (mode !== 'general') traversalOrder = getTraversal(root, mode);
+  renderTraversal();
+  message.textContent = root ? `已重置${modeLabels[mode]}遍歷；按「下一步」重新開始。` : '請先切回一般模式，建立一棵樹。';
+  message.className = 'message';
+  updateProgress();
+}
+
+nextButton.addEventListener('click', () => mode === 'general' ? addNextNumber() : visitNextNode());
+resetButton.addEventListener('click', () => mode === 'general' ? resetTree() : resetTraversal());
+modeButtons.forEach((button) => button.addEventListener('click', () => changeMode(button.dataset.mode)));
 exampleButton.addEventListener('click', () => {
   input.value = example.join(', ');
+  if (mode !== 'general') changeMode('general');
   resetTree();
   message.textContent = '已載入範例數列，按「下一數字」開始插入。';
 });
@@ -204,7 +304,9 @@ input.addEventListener('input', () => {
     if (parsed.error || !sameSequence(parsed.values)) {
       resetTree();
       input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
-      message.textContent = parsed.error || '數列已變更，按「下一數字」從第一個數字開始。';
+      message.textContent = parsed.error || (mode === 'general'
+        ? '數列已變更，按「下一數字」從第一個數字開始。'
+        : '數列已變更；請切回一般模式重新建立樹。');
       message.className = parsed.error ? 'message error' : 'message';
       return;
     }
@@ -219,8 +321,10 @@ input.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') addNextNumber();
 });
 window.addEventListener('resize', () => {
-  drawTree(root);
+  if (mode === 'general') drawTree(root);
+  else renderTraversal();
 });
 
 drawTree(null);
+updateModeControls();
 updateProgress();
