@@ -50,6 +50,13 @@ h1 em { color: var(--green); font-style: normal; }
 .panel-heading h2, .tree-toolbar h2 { margin: 0; font: 500 23px var(--serif); letter-spacing: -.02em; }
 .step-badge { margin-top: 2px; padding: 6px 8px; border-radius: 7px; background: #edf2e9; color: #53704d; font: 10px var(--mono); letter-spacing: .08em; }
 .panel-copy { margin: 13px 0 19px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.mode-control { margin: -5px 0 17px; }
+.mode-caption { margin: 0 0 7px; color: #414c44; font-size: 12px; font-weight: 650; }
+.mode-switch { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid #e5e6dc; border-radius: 11px; background: #f6f6f0; }
+.mode-button { min-height: 31px; padding: 0 3px; border: 0; border-radius: 7px; background: transparent; color: #627066; cursor: pointer; font-size: 11px; transition: background .15s, color .15s; }
+.mode-button:hover { background: #e9eee5; color: #334c3a; }
+.mode-button.active { background: var(--green); color: white; box-shadow: 0 2px 5px #245b4620; }
+.mode-note { min-height: 17px; margin: 7px 1px 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .control-panel label { display: block; margin-bottom: 7px; color: #414c44; font-size: 12px; font-weight: 650; }
 textarea { display: block; width: 100%; min-height: 86px; resize: vertical; padding: 12px; border: 1px solid #d9ddd5; border-radius: 11px; background: #fcfcf8; color: #26342b; font: 13px/1.75 var(--mono); outline: none; transition: border-color .16s, box-shadow .16s; }
 textarea:focus { border-color: #86a98a; box-shadow: 0 0 0 4px #86a98a20; }
@@ -87,6 +94,10 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .node text { fill: #2a4233; font: 600 12px var(--mono); }
 .node.root-node circle { fill: var(--green); stroke: var(--green); }
 .node.root-node text { fill: white; }
+.node.visited circle { fill: #dcebd8; stroke: #6d9871; }
+.node.visited text { fill: #294832; }
+.node.current-visit circle { fill: var(--orange); stroke: #b86b3a; stroke-width: 3; }
+.node.current-visit text { fill: white; }
 .node { animation: appear .35s cubic-bezier(.2,.8,.2,1) both; transform-box: fill-box; transform-origin: center; }
 .nodes .node:nth-child(2) { animation-delay: .04s; }.nodes .node:nth-child(3) { animation-delay: .08s; }.nodes .node:nth-child(4) { animation-delay: .12s; }.nodes .node:nth-child(5) { animation-delay: .16s; }
 .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); text-align: center; }
