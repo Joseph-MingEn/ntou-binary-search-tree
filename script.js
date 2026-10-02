@@ -2,6 +2,8 @@ const input = document.querySelector('#sequenceInput');
 const nextButton = document.querySelector('#nextButton');
 const resetButton = document.querySelector('#resetButton');
 const exampleButton = document.querySelector('#exampleButton');
+const animationButton = document.querySelector('#animationButton');
+const animationButtonLabel = document.querySelector('#animationButtonLabel');
 const svg = document.querySelector('#treeSvg');
 const stage = document.querySelector('#treeStage');
 const emptyState = document.querySelector('#emptyState');
@@ -17,12 +19,16 @@ const MAX_NODES = 31;
 const NODE_RADIUS = 24;
 const X_GAP = 62;
 const Y_GAP = 82;
+const ANIMATION_INTERVAL = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 250 : 700;
 let activeValues = null;
 let insertedCount = 0;
+let lastInsertedValue = null;
 let root = null;
 let mode = 'general';
 let traversalOrder = [];
 let traversalIndex = 0;
+let animationRunning = false;
+let animationTimer = null;
 const modeLabels = { preorder: '前序', inorder: '中序', postorder: '後序' };
 
 function parseSequence(value) {
@@ -42,10 +48,10 @@ function parseSequence(value) {
   return { values };
 }
 
-function insert(root, value, depth = 0) {
-  if (!root) return { value, depth, left: null, right: null };
-  if (value < root.value) root.left = insert(root.left, value, depth + 1);
-  else root.right = insert(root.right, value, depth + 1);
+function insert(root, value, insertionOrder, depth = 0) {
+  if (!root) return { value, depth, insertionOrder, left: null, right: null };
+  if (value < root.value) root.left = insert(root.left, value, insertionOrder, depth + 1);
+  else root.right = insert(root.right, value, insertionOrder, depth + 1);
   return root;
 }
 
@@ -128,7 +134,7 @@ function drawTree(root, visitedNodes = [], currentNode = null) {
     const classes = ['node'];
     if (node === root) classes.push('root-node');
     if (visited.has(node)) classes.push('visited');
-    if (node === currentNode) classes.push('current-visit');
+    if ((mode === 'general' && node.value === lastInsertedValue) || (mode !== 'general' && node === currentNode)) classes.push('current-visit');
     const group = svgElement('g', { class: classes.join(' '), transform: `translate(${cx} ${y})` });
     const title = svgElement('title');
     const visitPosition = traversalOrder.indexOf(node);
@@ -137,7 +143,13 @@ function drawTree(root, visitedNodes = [], currentNode = null) {
     const circle = svgElement('circle', { r: NODE_RADIUS });
     const label = svgElement('text', { 'text-anchor': 'middle', dy: '0.36em' });
     label.textContent = node.value;
-    group.append(title, circle, label);
+    const orderNumber = mode === 'general' ? node.insertionOrder : visitPosition + 1;
+    const badge = svgElement('g', { class: 'visit-badge', transform: 'translate(-17 -17)', 'aria-hidden': 'true' });
+    const badgeCircle = svgElement('circle', { r: '9.5' });
+    const badgeText = svgElement('text', { 'text-anchor': 'middle', dy: '0.35em' });
+    badgeText.textContent = String(orderNumber);
+    badge.append(badgeCircle, badgeText);
+    group.append(title, circle, label, badge);
     nodes.append(group);
   });
   svg.append(nodes);
@@ -190,8 +202,9 @@ function addNextNumber() {
   }
 
   const value = activeValues[insertedCount];
-  root = insert(root, value);
+  root = insert(root, value, insertedCount + 1);
   insertedCount += 1;
+  lastInsertedValue = value;
   drawTree(root);
   traversalOrder = [];
   traversalIndex = 0;
@@ -205,6 +218,7 @@ function resetTree() {
   root = null;
   activeValues = null;
   insertedCount = 0;
+  lastInsertedValue = null;
   traversalOrder = [];
   traversalIndex = 0;
   input.setAttribute('aria-invalid', 'false');
@@ -288,16 +302,109 @@ function resetTraversal() {
   updateProgress();
 }
 
-nextButton.addEventListener('click', () => mode === 'general' ? addNextNumber() : visitNextNode());
-resetButton.addEventListener('click', () => mode === 'general' ? resetTree() : resetTraversal());
-modeButtons.forEach((button) => button.addEventListener('click', () => changeMode(button.dataset.mode)));
+function stopAnimation() {
+  if (animationTimer !== null) window.clearTimeout(animationTimer);
+  animationTimer = null;
+  animationRunning = false;
+  animationButton.setAttribute('aria-pressed', 'false');
+  animationButtonLabel.textContent = '▶　播放演化動畫';
+  animationButton.classList.remove('running');
+}
+
+function animationStep() {
+  if (!animationRunning) return;
+  if (mode === 'general') addNextNumber();
+  else visitNextNode();
+
+  const finished = mode === 'general'
+    ? activeValues !== null && insertedCount >= activeValues.length
+    : Boolean(root) && traversalIndex >= traversalOrder.length;
+  if (finished || (mode !== 'general' && !root)) {
+    stopAnimation();
+    return;
+  }
+  animationTimer = window.setTimeout(animationStep, ANIMATION_INTERVAL);
+}
+
+function startAnimation() {
+  if (mode === 'general') {
+    const parsed = parseSequence(input.value);
+    input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
+    if (parsed.error) {
+      message.textContent = parsed.error;
+      message.className = 'message error';
+      return;
+    }
+    if (!sameSequence(parsed.values)) {
+      activeValues = parsed.values;
+      insertedCount = 0;
+      root = null;
+      lastInsertedValue = null;
+      traversalOrder = [];
+      traversalIndex = 0;
+      drawTree(null);
+    } else if (insertedCount >= activeValues.length) {
+      insertedCount = 0;
+      root = null;
+      lastInsertedValue = null;
+      drawTree(null);
+    }
+    updateProgress();
+  } else {
+    if (!root) {
+      message.textContent = '請先切回一般模式，插入數字並建立樹。';
+      message.className = 'message error';
+      return;
+    }
+    if (!traversalOrder.length) traversalOrder = getTraversal(root, mode);
+    if (traversalIndex >= traversalOrder.length) {
+      traversalIndex = 0;
+      renderTraversal();
+      updateProgress();
+    }
+  }
+
+  animationRunning = true;
+  animationButton.setAttribute('aria-pressed', 'true');
+  animationButtonLabel.textContent = '■　停止動畫';
+  animationButton.classList.add('running');
+  message.textContent = mode === 'general' ? '樹正在依序插入數字…' : `${modeLabels[mode]}遍歷動畫進行中…`;
+  message.className = 'message';
+  animationTimer = window.setTimeout(animationStep, 250);
+}
+
+function stepForward() {
+  if (animationRunning) stopAnimation();
+  if (mode === 'general') addNextNumber();
+  else visitNextNode();
+}
+
+animationButton.addEventListener('click', () => {
+  if (animationRunning) {
+    stopAnimation();
+    message.textContent = '演化動畫已停止。';
+    message.className = 'message';
+  } else startAnimation();
+});
+nextButton.addEventListener('click', stepForward);
+resetButton.addEventListener('click', () => {
+  stopAnimation();
+  if (mode === 'general') resetTree();
+  else resetTraversal();
+});
+modeButtons.forEach((button) => button.addEventListener('click', () => {
+  stopAnimation();
+  changeMode(button.dataset.mode);
+}));
 exampleButton.addEventListener('click', () => {
+  stopAnimation();
   input.value = example.join(', ');
   if (mode !== 'general') changeMode('general');
   resetTree();
   message.textContent = '已載入範例數列，按「下一數字」開始插入。';
 });
 input.addEventListener('input', () => {
+  if (animationRunning) stopAnimation();
   const parsed = parseSequence(input.value);
   input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
   if (activeValues) {
@@ -318,7 +425,7 @@ input.addEventListener('input', () => {
   }
 });
 input.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') addNextNumber();
+  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') stepForward();
 });
 window.addEventListener('resize', () => {
   if (mode === 'general') drawTree(root);
