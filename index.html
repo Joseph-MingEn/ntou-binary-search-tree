@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f5f1e8">
   <meta name="description" content="輸入不重複數列，觀察二元搜尋樹如何依序建立。">
   <title>二元搜尋樹｜資料結構互動展示</title>
-  <link rel="stylesheet" href="style.css?v=animation-1">
+  <link rel="stylesheet" href="style.css?v=animation-2">
 </head>
 <body>
   <main class="shell">
@@ -51,6 +51,11 @@
           <button id="exampleButton" class="example-button" type="button" aria-label="載入範例數列">範例</button>
         </div>
         <button id="animationButton" class="animation-button" type="button" aria-pressed="false"><span id="animationButtonLabel">▶　播放演化動畫</span></button>
+        <div class="speed-control">
+          <label for="animationSpeed"><span>動畫速度</span><output id="animationSpeedValue" for="animationSpeed">0.7 秒／步</output></label>
+          <input id="animationSpeed" type="range" min="100" max="1500" step="100" value="700" aria-label="調整動畫速度">
+          <div class="speed-range-labels" aria-hidden="true"><span>快</span><span>慢</span></div>
+        </div>
         <p id="message" class="message" aria-live="polite">按「下一數字」逐步插入，一次新增一個節點。</p>
         <div class="panel-divider"></div>
         <div class="concept-note"><span class="note-mark">i</span><p><b>插入順序會影響樹形</b><br>同一組數字若順序不同，長出的樹也可能不同。此處依照你輸入的順序，只建立一棵樹。</p></div>
@@ -71,6 +76,6 @@
 
     <footer><span>COMPARE <b>→</b> PLACE <b>→</b> CONNECT</span><span>二元搜尋樹 · Binary Search Tree</span><span>資料結構練習 <i>✳</i></span></footer>
   </main>
-  <script src="script.js?v=animation-1"></script>
+  <script src="script.js?v=animation-2"></script>
 </body>
 </html>
