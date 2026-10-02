@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f5f1e8">
   <meta name="description" content="輸入不重複數列，觀察二元搜尋樹如何依序建立。">
   <title>二元搜尋樹｜資料結構互動展示</title>
-  <link rel="stylesheet" href="style.css?v=traversal-1">
+  <link rel="stylesheet" href="style.css?v=animation-1">
 </head>
 <body>
   <main class="shell">
@@ -50,6 +50,7 @@
           <button id="resetButton" class="reset-button" type="button">重置</button>
           <button id="exampleButton" class="example-button" type="button" aria-label="載入範例數列">範例</button>
         </div>
+        <button id="animationButton" class="animation-button" type="button" aria-pressed="false"><span id="animationButtonLabel">▶　播放演化動畫</span></button>
         <p id="message" class="message" aria-live="polite">按「下一數字」逐步插入，一次新增一個節點。</p>
         <div class="panel-divider"></div>
         <div class="concept-note"><span class="note-mark">i</span><p><b>插入順序會影響樹形</b><br>同一組數字若順序不同，長出的樹也可能不同。此處依照你輸入的順序，只建立一棵樹。</p></div>
@@ -64,12 +65,12 @@
           <svg id="treeSvg" role="img" aria-label="二元搜尋樹圖形" focusable="false"></svg>
           <div id="emptyState" class="empty-state" hidden><span class="empty-glyph">⌘</span><b>輸入數列，讓樹開始生長</b><small>節點會按照由上而下、由左至右的結構排列</small></div>
         </div>
-        <div class="tree-legend"><span><i class="legend-node"></i>節點</span><span><i class="legend-line"></i>父子連結</span><span class="legend-caption">同一數列順序 → 唯一棵樹</span></div>
+        <div class="tree-legend"><span><i class="legend-node"></i>節點</span><span><i class="legend-line"></i>父子連結</span><span><i class="legend-order">1</i>左上角數字＝造訪順序</span><span class="legend-caption">同一數列順序 → 唯一棵樹</span></div>
       </section>
     </section>
 
     <footer><span>COMPARE <b>→</b> PLACE <b>→</b> CONNECT</span><span>二元搜尋樹 · Binary Search Tree</span><span>資料結構練習 <i>✳</i></span></footer>
   </main>
-  <script src="script.js?v=traversal-1"></script>
+  <script src="script.js?v=animation-1"></script>
 </body>
 </html>
