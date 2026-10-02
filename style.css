@@ -76,6 +76,14 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .speed-control output { color: var(--muted); font: 10px var(--mono); font-weight: 400; }
 .speed-control input { display: block; width: 100%; height: 16px; margin: 0; accent-color: var(--green); cursor: pointer; }
 .speed-range-labels { display: flex; justify-content: space-between; margin: 1px 1px 0; color: var(--soft); font-size: 9px; }
+.add-number-control { margin-top: 12px; }
+.add-number-control > label { margin: 0 1px 6px; }
+.add-number-row { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 7px; }
+.add-number-row input { width: 100%; min-width: 0; min-height: 37px; padding: 0 10px; border: 1px solid #d9ddd5; border-radius: 9px; background: #fcfcf8; color: #26342b; font: 11px var(--mono); }
+.add-number-row input::placeholder { color: #9aa198; font: 10px var(--sans); }
+.add-number-row input:focus { border-color: #86a98a; outline: 3px solid #86a98a20; }
+.add-number-row button { border: 1px solid #cbd9c8; border-radius: 9px; background: #edf3e9; color: #426349; cursor: pointer; font-size: 11px; font-weight: 650; }
+.add-number-row button:hover { background: #e2ecde; }
 .reset-button, .example-button { border: 1px solid var(--line); background: white; color: #4c5a50; font-size: 12px; }
 .reset-button:hover, .example-button:hover { background: #f4f6f0; }
 .message { min-height: 36px; margin: 13px 0 0; color: #627066; font-size: 11px; line-height: 1.65; }
@@ -96,7 +104,7 @@ textarea[aria-invalid="true"] { border-color: #bb745f; }
 .tree-stage { position: relative; min-height: 320px; margin-top: 18px; overflow: auto hidden; border: 1px solid #eeede5; border-radius: 14px; background-color: #fbfaf5; background-image: radial-gradient(#d7ddd3 0.8px, transparent .8px); background-size: 20px 20px; scrollbar-color: #bec9bb transparent; scrollbar-width: thin; }
 #treeSvg { display: block; margin: 0 auto; overflow: visible; }
 #treeSvg[hidden] { display: none; }
-#treeSvg.animating .node { animation: none; opacity: 1; }
+#treeSvg.stable-tree .node { animation: none; opacity: 1; }
 .edge { fill: none; stroke-width: 2; stroke-linecap: round; }
 .edge-left { stroke: #7c9a78; }.edge-right { stroke: #d4a079; }
 .node circle { fill: #fffefa; stroke: #a9b8a2; stroke-width: 2; filter: drop-shadow(0 3px 4px #2e48301a); }
