@@ -2,6 +2,8 @@ const input = document.querySelector('#sequenceInput');
 const nextButton = document.querySelector('#nextButton');
 const resetButton = document.querySelector('#resetButton');
 const exampleButton = document.querySelector('#exampleButton');
+const newNumberInput = document.querySelector('#newNumberInput');
+const addNumberButton = document.querySelector('#addNumberButton');
 const animationButton = document.querySelector('#animationButton');
 const animationButtonLabel = document.querySelector('#animationButtonLabel');
 const animationSpeed = document.querySelector('#animationSpeed');
@@ -216,6 +218,70 @@ function addNextNumber() {
   updateProgress();
 }
 
+function addCustomNumber() {
+  if (animationRunning) stopAnimation();
+  if (mode !== 'general') {
+    message.textContent = '請切回一般模式後新增數字。';
+    message.className = 'message error';
+    return;
+  }
+
+  const rawNumber = newNumberInput.value.trim();
+  if (!/^[+-]?\d+$/.test(rawNumber)) {
+    message.textContent = '請輸入一個有效的整數。';
+    message.className = 'message error';
+    newNumberInput.focus();
+    return;
+  }
+  const value = Number(rawNumber);
+  if (!Number.isSafeInteger(value)) {
+    message.textContent = '這個數字超出可安全處理的整數範圍。';
+    message.className = 'message error';
+    newNumberInput.focus();
+    return;
+  }
+
+  const parsed = input.value.trim() ? parseSequence(input.value) : { values: [] };
+  if (parsed.error) {
+    message.textContent = parsed.error;
+    message.className = 'message error';
+    return;
+  }
+  if (parsed.values.includes(value)) {
+    message.textContent = `數字 ${value} 已在數列中，請輸入不重複的數字。`;
+    message.className = 'message error';
+    newNumberInput.focus();
+    return;
+  }
+  if (parsed.values.length >= MAX_NODES) {
+    message.textContent = `樹最多顯示 ${MAX_NODES} 個數字，請先重置或縮短數列。`;
+    message.className = 'message error';
+    return;
+  }
+
+  if (!sameSequence(parsed.values)) {
+    activeValues = parsed.values;
+    insertedCount = 0;
+    root = null;
+    lastInsertedValue = null;
+    traversalOrder = [];
+    traversalIndex = 0;
+  }
+  activeValues.splice(insertedCount, 0, value);
+  input.value = activeValues.join(', ');
+  root = insert(root, value, insertedCount + 1);
+  insertedCount += 1;
+  lastInsertedValue = value;
+  traversalOrder = [];
+  traversalIndex = 0;
+  newNumberInput.value = '';
+  input.setAttribute('aria-invalid', 'false');
+  drawTree(root);
+  message.textContent = `已新增數字 ${value}，並立即插入樹中（第 ${insertedCount} 個）。`;
+  message.className = 'message success';
+  updateProgress();
+}
+
 function resetTree() {
   root = null;
   activeValues = null;
@@ -223,6 +289,7 @@ function resetTree() {
   lastInsertedValue = null;
   traversalOrder = [];
   traversalIndex = 0;
+  svg.classList.remove('stable-tree');
   input.setAttribute('aria-invalid', 'false');
   drawTree(null);
   message.textContent = mode === 'general'
@@ -311,7 +378,6 @@ function stopAnimation() {
   animationButton.setAttribute('aria-pressed', 'false');
   animationButtonLabel.textContent = '▶　播放演化動畫';
   animationButton.classList.remove('running');
-  svg.classList.remove('animating');
 }
 
 function animationStep() {
@@ -371,7 +437,7 @@ function startAnimation() {
   animationButton.setAttribute('aria-pressed', 'true');
   animationButtonLabel.textContent = '■　停止動畫';
   animationButton.classList.add('running');
-  svg.classList.add('animating');
+  svg.classList.add('stable-tree');
   message.textContent = mode === 'general' ? '樹正在依序插入數字…' : `${modeLabels[mode]}遍歷動畫進行中…`;
   message.className = 'message';
   animationTimer = window.setTimeout(animationStep, animationInterval);
@@ -401,6 +467,10 @@ animationButton.addEventListener('click', () => {
   } else startAnimation();
 });
 animationSpeed.addEventListener('input', updateAnimationSpeed);
+addNumberButton.addEventListener('click', addCustomNumber);
+newNumberInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') addCustomNumber();
+});
 nextButton.addEventListener('click', stepForward);
 resetButton.addEventListener('click', () => {
   stopAnimation();
