@@ -4,6 +4,8 @@ const resetButton = document.querySelector('#resetButton');
 const exampleButton = document.querySelector('#exampleButton');
 const animationButton = document.querySelector('#animationButton');
 const animationButtonLabel = document.querySelector('#animationButtonLabel');
+const animationSpeed = document.querySelector('#animationSpeed');
+const animationSpeedValue = document.querySelector('#animationSpeedValue');
 const svg = document.querySelector('#treeSvg');
 const stage = document.querySelector('#treeStage');
 const emptyState = document.querySelector('#emptyState');
@@ -19,7 +21,7 @@ const MAX_NODES = 31;
 const NODE_RADIUS = 24;
 const X_GAP = 62;
 const Y_GAP = 82;
-const ANIMATION_INTERVAL = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 250 : 700;
+let animationInterval = Number(animationSpeed.value);
 let activeValues = null;
 let insertedCount = 0;
 let lastInsertedValue = null;
@@ -309,6 +311,7 @@ function stopAnimation() {
   animationButton.setAttribute('aria-pressed', 'false');
   animationButtonLabel.textContent = '▶　播放演化動畫';
   animationButton.classList.remove('running');
+  svg.classList.remove('animating');
 }
 
 function animationStep() {
@@ -323,7 +326,7 @@ function animationStep() {
     stopAnimation();
     return;
   }
-  animationTimer = window.setTimeout(animationStep, ANIMATION_INTERVAL);
+  animationTimer = window.setTimeout(animationStep, animationInterval);
 }
 
 function startAnimation() {
@@ -368,9 +371,20 @@ function startAnimation() {
   animationButton.setAttribute('aria-pressed', 'true');
   animationButtonLabel.textContent = '■　停止動畫';
   animationButton.classList.add('running');
+  svg.classList.add('animating');
   message.textContent = mode === 'general' ? '樹正在依序插入數字…' : `${modeLabels[mode]}遍歷動畫進行中…`;
   message.className = 'message';
-  animationTimer = window.setTimeout(animationStep, 250);
+  animationTimer = window.setTimeout(animationStep, animationInterval);
+}
+
+function updateAnimationSpeed() {
+  animationInterval = Number(animationSpeed.value);
+  animationSpeedValue.value = `${(animationInterval / 1000).toFixed(1)} 秒／步`;
+  animationSpeedValue.textContent = animationSpeedValue.value;
+  if (animationRunning && animationTimer !== null) {
+    window.clearTimeout(animationTimer);
+    animationTimer = window.setTimeout(animationStep, animationInterval);
+  }
 }
 
 function stepForward() {
@@ -386,6 +400,7 @@ animationButton.addEventListener('click', () => {
     message.className = 'message';
   } else startAnimation();
 });
+animationSpeed.addEventListener('input', updateAnimationSpeed);
 nextButton.addEventListener('click', stepForward);
 resetButton.addEventListener('click', () => {
   stopAnimation();
@@ -435,3 +450,4 @@ window.addEventListener('resize', () => {
 drawTree(null);
 updateModeControls();
 updateProgress();
+updateAnimationSpeed();
