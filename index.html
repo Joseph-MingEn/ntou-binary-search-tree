@@ -31,12 +31,22 @@
     <section class="workspace" aria-label="二元搜尋樹建置器">
       <aside class="control-panel">
         <div class="panel-heading"><div><p class="eyebrow">01 / INPUT</p><h2>輸入數列</h2></div><span class="step-badge">STEP</span></div>
-        <p class="panel-copy">先輸入一串不重複的整數，再按「下一數字」逐步插入。</p>
+        <p class="panel-copy">先輸入一串不重複的整數，再選擇操作模式。</p>
+        <div class="mode-control">
+          <p class="mode-caption">操作模式</p>
+          <div class="mode-switch" role="group" aria-label="切換樹操作模式">
+            <button class="mode-button active" type="button" data-mode="general" aria-pressed="true">一般</button>
+            <button class="mode-button" type="button" data-mode="preorder" aria-pressed="false">前序</button>
+            <button class="mode-button" type="button" data-mode="inorder" aria-pressed="false">中序</button>
+            <button class="mode-button" type="button" data-mode="postorder" aria-pressed="false">後序</button>
+          </div>
+          <p class="mode-note" id="modeNote">逐個插入數字，建立二元搜尋樹。</p>
+        </div>
         <label for="sequenceInput">數列</label>
         <textarea id="sequenceInput" rows="3" spellcheck="false" aria-describedby="inputHint">48, 25, 72, 12, 36, 60, 90, 30, 42</textarea>
         <p class="input-hint" id="inputHint">最多 31 個數字，確保樹形清楚易讀。</p>
         <div class="button-row">
-          <button id="nextButton" class="build-button" type="button"><span>下一數字</span><b>↗</b></button>
+          <button id="nextButton" class="build-button" type="button"><span id="nextButtonLabel">下一數字</span><b>↗</b></button>
           <button id="resetButton" class="reset-button" type="button">重置</button>
           <button id="exampleButton" class="example-button" type="button" aria-label="載入範例數列">範例</button>
         </div>
