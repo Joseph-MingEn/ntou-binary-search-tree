@@ -1,90 +1,148 @@
 const input = document.querySelector('#sequenceInput');
-const nextButton = document.querySelector('#nextButton');
+const buildButton = document.querySelector('#buildButton');
 const resetButton = document.querySelector('#resetButton');
 const exampleButton = document.querySelector('#exampleButton');
+const addButton = document.querySelector('#addButton');
+const popButton = document.querySelector('#popButton');
+const previousButton = document.querySelector('#previousButton');
+const nextButton = document.querySelector('#nextButton');
+const playButton = document.querySelector('#playButton');
 const newNumberInput = document.querySelector('#newNumberInput');
-const addNumberButton = document.querySelector('#addNumberButton');
-const animationButton = document.querySelector('#animationButton');
-const animationButtonLabel = document.querySelector('#animationButtonLabel');
-const animationSpeed = document.querySelector('#animationSpeed');
-const animationSpeedValue = document.querySelector('#animationSpeedValue');
 const svg = document.querySelector('#treeSvg');
 const stage = document.querySelector('#treeStage');
 const emptyState = document.querySelector('#emptyState');
+const arrayView = document.querySelector('#arrayView');
 const message = document.querySelector('#message');
-const modeNote = document.querySelector('#modeNote');
-const modeButtons = [...document.querySelectorAll('[data-mode]')];
-const nextButtonLabel = document.querySelector('#nextButtonLabel');
 const nodeCount = document.querySelector('#nodeCount');
 const treeHeight = document.querySelector('#treeHeight');
+const maxValue = document.querySelector('#maxValue');
 const stepCount = document.querySelector('#stepCount');
-const example = [48, 25, 72, 12, 36, 60, 90, 30, 42];
+const extractedList = document.querySelector('#extractedValues');
+const extractedCount = document.querySelector('#extractedCount');
+
 const MAX_NODES = 31;
 const NODE_RADIUS = 24;
-const X_GAP = 62;
-const Y_GAP = 82;
-let animationInterval = Number(animationSpeed.value);
-let activeValues = null;
-let insertedCount = 0;
-let lastInsertedValue = null;
-let root = null;
-let mode = 'general';
-let traversalOrder = [];
-let traversalIndex = 0;
-let animationRunning = false;
-let animationTimer = null;
-const modeLabels = { preorder: '前序', inorder: '中序', postorder: '後序' };
+const LEVEL_GAP = 82;
+const PLAY_INTERVAL = 850;
+let heap = [];
+let poppedValues = [];
+let highlighted = new Set();
+let frames = [];
+let frameIndex = 0;
+let playTimer = null;
 
-function parseSequence(value) {
-  const parts = value.trim().split(/[\s,，、]+/).filter(Boolean);
+function parseSequence(text) {
+  const parts = text.trim().split(/[\s,，、]+/).filter(Boolean);
   if (!parts.length) return { error: '請先輸入至少一個整數。' };
-  if (parts.length > MAX_NODES) return { error: `目前輸入 ${parts.length} 個數字，請減少到 ${MAX_NODES} 個以內。` };
+  if (parts.length > MAX_NODES) return { error: `最多輸入 ${MAX_NODES} 個數字。` };
   const values = [];
   for (const part of parts) {
-    if (!/^[+-]?\d+$/.test(part)) return { error: `「${part}」不是有效的整數，請檢查輸入格式。` };
+    if (!/^[+-]?\d+$/.test(part)) return { error: `「${part}」不是有效的整數。` };
     const value = Number(part);
     if (!Number.isSafeInteger(value)) return { error: `「${part}」超出可安全處理的整數範圍。` };
+    if (values.includes(value)) return { error: `數字 ${value} 重複了，請輸入不重複的數列。` };
     values.push(value);
   }
-  const seen = new Set();
-  const duplicate = values.find((value) => seen.has(value) || !seen.add(value));
-  if (duplicate !== undefined) return { error: `數字 ${duplicate} 重複了，請輸入不重複的數列。` };
   return { values };
 }
 
-function insert(root, value, insertionOrder, depth = 0) {
-  if (!root) return { value, depth, insertionOrder, left: null, right: null };
-  if (value < root.value) root.left = insert(root.left, value, insertionOrder, depth + 1);
-  else root.right = insert(root.right, value, insertionOrder, depth + 1);
-  return root;
+function addFrame(targetFrames, values, focus, text, extracted = poppedValues) {
+  targetFrames.push({ heap: [...values], extracted: [...extracted], focus: [...focus], message: text });
 }
 
-function measure(root) {
-  let count = 0;
-  let deepest = 0;
-  function visit(node, depth) {
-    if (!node) return;
-    count += 1;
-    deepest = Math.max(deepest, depth);
-    visit(node.left, depth + 1);
-    visit(node.right, depth + 1);
+function traceInsert(values, value, targetFrames) {
+  let index = values.length;
+  values.push(value);
+  addFrame(targetFrames, values, [index], `將 ${value} 放到索引 ${index}（由左至右補入下一個空位）。`);
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2);
+    addFrame(targetFrames, values, [parent, index], `比較父節點 ${values[parent]} 與子節點 ${values[index]}。`);
+    if (values[parent] >= values[index]) break;
+    [values[parent], values[index]] = [values[index], values[parent]];
+    addFrame(targetFrames, values, [parent, index], `${values[parent]} 大於 ${values[index]}，交換兩個節點，讓較大值往上。`);
+    index = parent;
   }
-  visit(root, 0);
-  return { count, height: root ? deepest + 1 : 0 };
 }
 
-function layout(root) {
-  const points = [];
-  let inorderIndex = 0;
-  function visit(node, depth) {
-    if (!node) return;
-    visit(node.left, depth + 1);
-    points.push({ node, x: inorderIndex * X_GAP, y: depth * Y_GAP + 44 });
-    inorderIndex += 1;
-    visit(node.right, depth + 1);
+function tracePop(values, targetFrames, history = poppedValues) {
+  const removed = values[0];
+  const nextHistory = [...history, removed];
+  if (values.length === 1) {
+    values.pop();
+    addFrame(targetFrames, values, [], `取出最大值 ${removed}，堆已清空。`, nextHistory);
+    return;
   }
-  visit(root, 0);
-  return points;
+  const moved = values.pop();
+  values[0] = moved;
+  addFrame(targetFrames, values, [0], `取出最大值 ${removed}，把最後一個節點 ${moved} 移到根部。`, nextHistory);
+  let index = 0;
+  while (true) {
+    const left = index * 2 + 1;
+    const right = left + 1;
+    if (left >= values.length) {
+      addFrame(targetFrames, values, [index], `索引 ${index} 的節點沒有子節點，堆序已恢復。`, nextHistory);
+      break;
+    }
+    let largerChild = left;
+    const compared = [index, left];
+    if (right < values.length) {
+      compared.push(right);
+      if (values[right] > values[left]) largerChild = right;
+    }
+    const childDescription = right < values.length
+      ? `比較左右子節點 ${values[left]} 與 ${values[right]}`
+      : `檢查唯一子節點 ${values[left]}`;
+    const chosenDescription = right < values.length
+      ? `選索引 ${largerChild} 的較大子節點 ${values[largerChild]}`
+      : `選索引 ${largerChild} 的子節點 ${values[largerChild]}`;
+    if (values[largerChild] <= values[index]) {
+      addFrame(targetFrames, values, compared, `${childDescription}；${chosenDescription}仍不大於父節點 ${values[index]}，堆序恢復完成。`, nextHistory);
+      break;
+    }
+    addFrame(targetFrames, values, compared, `${childDescription}；${chosenDescription}大於父節點 ${values[index]}，需要交換。`, nextHistory);
+    [values[index], values[largerChild]] = [values[largerChild], values[index]];
+    addFrame(targetFrames, values, [index, largerChild], `將較大的子節點 ${values[index]} 上移，繼續往下檢查。`, nextHistory);
+    index = largerChild;
+  }
+}
+
+function traceBuildMaxHeap(values, targetFrames) {
+  const heapSize = values.length;
+  for (let start = Math.floor(heapSize / 2) - 1; start >= 0; start -= 1) {
+    let index = start;
+    while (true) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      if (left >= heapSize) break;
+      let largerChild = left;
+      const compared = [index, left];
+      if (right < heapSize) {
+        compared.push(right);
+        if (values[right] > values[left]) largerChild = right;
+      }
+      const childText = right < heapSize
+        ? `比較左右子節點 ${values[left]} 與 ${values[right]}，選較大的 ${values[largerChild]}`
+        : `檢查唯一子節點 ${values[left]}`;
+      if (values[largerChild] <= values[index]) {
+        addFrame(targetFrames, values, compared, `${childText}不大於父節點 ${values[index]}，此分支符合最大堆。`);
+        break;
+      }
+      addFrame(targetFrames, values, compared, `${childText}大於父節點 ${values[index]}，先交換以建立最大堆。`);
+      [values[index], values[largerChild]] = [values[largerChild], values[index]];
+      addFrame(targetFrames, values, [index, largerChild], `將較大的子節點 ${values[index]} 上移，繼續調整此子樹。`);
+      index = largerChild;
+    }
+  }
+  addFrame(targetFrames, values, [], `最大堆已建立，根節點 ${values[0]} 是目前最大值。`);
+}
+
+function isMaxHeap(values) {
+  for (let parent = 0; parent < Math.floor(values.length / 2); parent += 1) {
+    const left = parent * 2 + 1;
+    const right = left + 1;
+    if (values[parent] < values[left] || right < values.length && values[parent] < values[right]) return false;
+  }
+  return true;
 }
 
 function svgElement(name, attributes = {}) {
@@ -93,431 +151,256 @@ function svgElement(name, attributes = {}) {
   return element;
 }
 
-function drawTree(root, visitedNodes = [], currentNode = null) {
+function nodePosition(index, width) {
+  const depth = Math.floor(Math.log2(index + 1));
+  const firstAtLevel = (2 ** depth) - 1;
+  const position = index - firstAtLevel;
+  const slots = 2 ** depth;
+  return { x: ((position + 0.5) / slots) * width, y: 48 + depth * LEVEL_GAP };
+}
+
+function drawHeap() {
   svg.replaceChildren();
-  if (!root) {
-    svg.hidden = true;
-    emptyState.hidden = false;
-    nodeCount.textContent = '0';
-    treeHeight.textContent = '0';
+  const isEmpty = heap.length === 0;
+  svg.hidden = isEmpty;
+  emptyState.hidden = !isEmpty;
+  arrayView.replaceChildren();
+  nodeCount.textContent = String(heap.length);
+  const height = heap.length ? Math.floor(Math.log2(heap.length)) + 1 : 0;
+  treeHeight.textContent = String(height);
+  maxValue.textContent = heap.length ? String(heap[0]) : '—';
+  popButton.disabled = isEmpty || frames.length > 0 && frameIndex < frames.length - 1;
+  if (isEmpty) {
+    drawArrayView();
     return;
   }
-  emptyState.hidden = true;
-  svg.hidden = false;
-  const points = layout(root);
-  const maxX = Math.max(...points.map((point) => point.x));
-  const maxY = Math.max(...points.map((point) => point.y));
-  const width = Math.max(stage.clientWidth, maxX + NODE_RADIUS * 2 + 48);
-  const height = maxY + NODE_RADIUS * 2 + 30;
-  const offsetX = Math.max(24, (width - (maxX + NODE_RADIUS * 2)) / 2);
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  svg.setAttribute('width', width);
-  svg.setAttribute('height', height);
-  svg.style.width = `${width}px`;
-  svg.style.height = `${height}px`;
 
-  const positions = new Map(points.map(({ node, x, y }) => [node, { x: x + offsetX, y }]));
+  const deepest = height - 1;
+  const minWidth = Math.max(stage.clientWidth, (2 ** deepest) * 72 + 40, 520);
+  const drawWidth = minWidth - 40;
+  const svgHeight = 48 + deepest * LEVEL_GAP + NODE_RADIUS * 2 + 32;
+  svg.setAttribute('viewBox', `0 0 ${minWidth} ${svgHeight}`);
+  svg.setAttribute('width', minWidth);
+  svg.setAttribute('height', svgHeight);
+  svg.style.width = `${minWidth}px`;
+  svg.style.height = `${svgHeight}px`;
+
+  const points = heap.map((value, index) => ({ value, index, ...nodePosition(index, drawWidth) }));
+  const offset = 20;
   const edges = svgElement('g', { class: 'edges' });
-  points.forEach(({ node }) => {
-    const from = positions.get(node);
-    for (const child of [node.left, node.right]) {
-      if (!child) continue;
-      const to = positions.get(child);
+  points.forEach((point) => {
+    const left = point.index * 2 + 1;
+    for (const childIndex of [left, left + 1]) {
+      if (childIndex >= points.length) continue;
+      const child = points[childIndex];
+      const direction = childIndex === left ? 'left' : 'right';
       edges.append(svgElement('path', {
-        class: `edge ${child.value < node.value ? 'edge-left' : 'edge-right'}`,
-        d: `M ${from.x} ${from.y + NODE_RADIUS} C ${from.x} ${from.y + 54}, ${to.x} ${to.y - 54}, ${to.x} ${to.y - NODE_RADIUS}`,
+        class: `edge edge-${direction}`,
+        d: `M ${point.x + offset} ${point.y + NODE_RADIUS} C ${point.x + offset} ${point.y + 52}, ${child.x + offset} ${child.y - 52}, ${child.x + offset} ${child.y - NODE_RADIUS}`,
       }));
     }
   });
   svg.append(edges);
 
   const nodes = svgElement('g', { class: 'nodes' });
-  const visited = new Set(visitedNodes);
-  points.forEach(({ node, x, y }) => {
-    const cx = x + offsetX;
+  points.forEach((point) => {
     const classes = ['node'];
-    if (node === root) classes.push('root-node');
-    if (visited.has(node)) classes.push('visited');
-    if ((mode === 'general' && node.value === lastInsertedValue) || (mode !== 'general' && node === currentNode)) classes.push('current-visit');
-    const group = svgElement('g', { class: classes.join(' '), transform: `translate(${cx} ${y})` });
+    if (point.index === 0) classes.push('root-node');
+    if (highlighted.has(point.index)) classes.push('highlighted');
+    const group = svgElement('g', { class: classes.join(' '), transform: `translate(${point.x + offset} ${point.y})` });
     const title = svgElement('title');
-    const visitPosition = traversalOrder.indexOf(node);
-    const visitHint = mode !== 'general' && visitPosition >= 0 ? `，${modeLabels[mode]}遍歷第 ${visitPosition + 1} 個` : '';
-    title.textContent = `${node.value}，${node === root ? '根節點' : '第 ' + (node.depth + 1) + ' 層'}${visitHint}`;
+    title.textContent = `索引 ${point.index}，數值 ${point.value}${point.index === 0 ? '，根節點，最大值' : ''}`;
     const circle = svgElement('circle', { r: NODE_RADIUS });
-    const label = svgElement('text', { 'text-anchor': 'middle', dy: '0.36em' });
-    label.textContent = node.value;
-    const orderNumber = mode === 'general' ? node.insertionOrder : visitPosition + 1;
-    const badge = svgElement('g', { class: 'visit-badge', transform: 'translate(-17 -17)', 'aria-hidden': 'true' });
+    const digits = point.value.toString().length;
+    const label = svgElement('text', { 'text-anchor': 'middle', dy: '0.36em', 'font-size': digits > 11 ? '7' : digits > 7 ? '9' : '12' });
+    label.textContent = point.value;
+    const badge = svgElement('g', { class: 'index-badge', transform: 'translate(-17 -17)', 'aria-hidden': 'true' });
     const badgeCircle = svgElement('circle', { r: '9.5' });
     const badgeText = svgElement('text', { 'text-anchor': 'middle', dy: '0.35em' });
-    badgeText.textContent = String(orderNumber);
+    badgeText.textContent = point.index;
     badge.append(badgeCircle, badgeText);
     group.append(title, circle, label, badge);
     nodes.append(group);
+
   });
   svg.append(nodes);
-  const stats = measure(root);
-  nodeCount.textContent = String(stats.count);
-  treeHeight.textContent = String(stats.height);
+  drawArrayView();
 }
 
-function sameSequence(values) {
-  return activeValues !== null && activeValues.length === values.length && activeValues.every((value, index) => value === values[index]);
-}
-
-function updateProgress() {
-  if (mode !== 'general') {
-    const total = traversalOrder.length;
-    stepCount.textContent = `${traversalIndex} / ${total}`;
-    nextButton.disabled = !root || traversalIndex >= total;
-    return;
-  }
-  const parsed = parseSequence(input.value);
-  if (parsed.error) {
-    stepCount.textContent = `${insertedCount} / —`;
-    nextButton.disabled = false;
-    return;
-  }
-  const matches = sameSequence(parsed.values);
-  stepCount.textContent = `${matches ? insertedCount : 0} / ${parsed.values.length}`;
-  nextButton.disabled = matches && insertedCount >= parsed.values.length;
-}
-
-function addNextNumber() {
-  const parsed = parseSequence(input.value);
-  input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
-  if (parsed.error) {
-    message.textContent = parsed.error;
-    message.className = 'message error';
-    return;
-  }
-
-  if (!sameSequence(parsed.values)) {
-    activeValues = parsed.values;
-    insertedCount = 0;
-    root = null;
-  }
-  if (insertedCount >= activeValues.length) {
-    message.textContent = '數列已全部插入。按「重置」可以重新開始。';
-    message.className = 'message success';
-    updateProgress();
-    return;
-  }
-
-  const value = activeValues[insertedCount];
-  root = insert(root, value, insertedCount + 1);
-  insertedCount += 1;
-  lastInsertedValue = value;
-  drawTree(root);
-  traversalOrder = [];
-  traversalIndex = 0;
-  message.textContent = `已新增第 ${insertedCount} / ${activeValues.length} 個數字：${value}。`;
-  if (insertedCount === activeValues.length) message.textContent += ' 數列插入完成。';
-  message.className = 'message success';
-  updateProgress();
-}
-
-function addCustomNumber() {
-  if (animationRunning) stopAnimation();
-  if (mode !== 'general') {
-    message.textContent = '請切回一般模式後新增數字。';
-    message.className = 'message error';
-    return;
-  }
-
-  const rawNumber = newNumberInput.value.trim();
-  if (!/^[+-]?\d+$/.test(rawNumber)) {
-    message.textContent = '請輸入一個有效的整數。';
-    message.className = 'message error';
-    newNumberInput.focus();
-    return;
-  }
-  const value = Number(rawNumber);
-  if (!Number.isSafeInteger(value)) {
-    message.textContent = '這個數字超出可安全處理的整數範圍。';
-    message.className = 'message error';
-    newNumberInput.focus();
-    return;
-  }
-
-  const parsed = input.value.trim() ? parseSequence(input.value) : { values: [] };
-  if (parsed.error) {
-    message.textContent = parsed.error;
-    message.className = 'message error';
-    return;
-  }
-  if (parsed.values.includes(value)) {
-    message.textContent = `數字 ${value} 已在數列中，請輸入不重複的數字。`;
-    message.className = 'message error';
-    newNumberInput.focus();
-    return;
-  }
-  if (parsed.values.length >= MAX_NODES) {
-    message.textContent = `樹最多顯示 ${MAX_NODES} 個數字，請先重置或縮短數列。`;
-    message.className = 'message error';
-    return;
-  }
-
-  if (!sameSequence(parsed.values)) {
-    activeValues = parsed.values;
-    insertedCount = 0;
-    root = null;
-    lastInsertedValue = null;
-    traversalOrder = [];
-    traversalIndex = 0;
-  }
-  activeValues.splice(insertedCount, 0, value);
-  input.value = activeValues.join(', ');
-  root = insert(root, value, insertedCount + 1);
-  insertedCount += 1;
-  lastInsertedValue = value;
-  traversalOrder = [];
-  traversalIndex = 0;
-  newNumberInput.value = '';
-  input.setAttribute('aria-invalid', 'false');
-  drawTree(root);
-  message.textContent = `已新增數字 ${value}，並立即插入樹中（第 ${insertedCount} 個）。`;
-  message.className = 'message success';
-  updateProgress();
-}
-
-function resetTree() {
-  root = null;
-  activeValues = null;
-  insertedCount = 0;
-  lastInsertedValue = null;
-  traversalOrder = [];
-  traversalIndex = 0;
-  svg.classList.remove('stable-tree');
-  input.setAttribute('aria-invalid', 'false');
-  drawTree(null);
-  message.textContent = mode === 'general'
-    ? '已重置；按「下一數字」從目前數列的第一個數字開始。'
-    : '樹已清空；請切回一般模式逐個插入數字。';
-  message.className = 'message';
-  updateProgress();
-}
-
-function getTraversal(node, order, values = []) {
-  if (!node) return values;
-  if (order === 'preorder') values.push(node);
-  getTraversal(node.left, order, values);
-  if (order === 'inorder') values.push(node);
-  getTraversal(node.right, order, values);
-  if (order === 'postorder') values.push(node);
-  return values;
-}
-
-function renderTraversal() {
-  const visited = traversalOrder.slice(0, traversalIndex);
-  drawTree(root, visited, visited[visited.length - 1] ?? null);
-}
-
-function updateModeControls() {
-  modeButtons.forEach((button) => {
-    const selected = button.dataset.mode === mode;
-    button.classList.toggle('active', selected);
-    button.setAttribute('aria-pressed', String(selected));
+function drawArrayView() {
+  arrayView.replaceChildren();
+  heap.forEach((value, index) => {
+    const cell = document.createElement('span');
+    cell.className = `array-cell${index === 0 ? ' array-root' : ''}${highlighted.has(index) ? ' array-highlighted' : ''}`;
+    cell.innerHTML = '<small></small><b></b>';
+    cell.querySelector('small').textContent = index;
+    cell.querySelector('b').textContent = value;
+    arrayView.append(cell);
   });
-  const isTraversal = mode !== 'general';
-  nextButtonLabel.textContent = isTraversal ? '下一步' : '下一數字';
-  modeNote.textContent = isTraversal
-    ? `${modeLabels[mode]}遍歷：依序標示拜訪到的節點。`
-    : '逐個插入數字，建立二元搜尋樹。';
-  updateProgress();
-}
-
-function changeMode(nextMode) {
-  mode = nextMode;
-  traversalIndex = 0;
-  traversalOrder = mode === 'general' ? [] : getTraversal(root, mode);
-  updateModeControls();
-  if (mode !== 'general') renderTraversal();
-  else drawTree(root);
-  if (mode === 'general') {
-    message.textContent = root ? '已切回一般模式，按「下一數字」繼續插入。' : '一般模式：按「下一數字」逐個建立二元搜尋樹。';
-  } else if (!root) {
-    message.textContent = `已切換到${modeLabels[mode]}遍歷；請先切回一般模式建立樹。`;
-  } else {
-    message.textContent = `已切換到${modeLabels[mode]}遍歷，按「下一步」開始。`;
+  extractedCount.textContent = `${poppedValues.length} 個`;
+  extractedList.replaceChildren();
+  if (!poppedValues.length) {
+    const hint = document.createElement('small');
+    hint.textContent = '取出結果會依序顯示在這裡';
+    extractedList.append(hint);
   }
-  message.className = 'message';
+  poppedValues.forEach((value, index) => {
+    const cell = document.createElement('span');
+    cell.className = 'extracted-chip';
+    cell.innerHTML = '<small></small><b></b>';
+    cell.querySelector('small').textContent = `第 ${index + 1} 個`;
+    cell.querySelector('b').textContent = value;
+    extractedList.append(cell);
+  });
 }
 
-function visitNextNode() {
-  if (!root) {
-    message.textContent = '請先切回一般模式，插入數字並建立樹。';
-    message.className = 'message error';
+function updatePlaybackControls() {
+  const last = Math.max(0, frames.length - 1);
+  stepCount.textContent = `${frames.length ? frameIndex + 1 : 0} / ${frames.length}`;
+  previousButton.disabled = !frames.length || frameIndex <= 0 || Boolean(playTimer);
+  nextButton.disabled = !frames.length || frameIndex >= last || Boolean(playTimer);
+  playButton.disabled = !frames.length || frameIndex >= last && !playTimer;
+  playButton.setAttribute('aria-pressed', String(Boolean(playTimer)));
+  playButton.textContent = playTimer ? '■　停止播放' : '▶　自動播放';
+}
+
+function showFrame(index) {
+  if (!frames.length) return;
+  frameIndex = Math.max(0, Math.min(index, frames.length - 1));
+  const frame = frames[frameIndex];
+  heap = [...frame.heap];
+  poppedValues = [...(frame.extracted ?? [])];
+  highlighted = new Set(frame.focus);
+  drawHeap();
+  setMessage(frame.message, frameIndex === frames.length - 1 ? 'success' : '');
+  updatePlaybackControls();
+}
+
+function stopPlayback() {
+  if (playTimer) window.clearInterval(playTimer);
+  playTimer = null;
+  updatePlaybackControls();
+}
+
+function playNext() {
+  if (frameIndex >= frames.length - 1) {
+    stopPlayback();
     return;
   }
-  if (!traversalOrder.length) traversalOrder = getTraversal(root, mode);
-  if (traversalIndex >= traversalOrder.length) return;
-  const node = traversalOrder[traversalIndex];
-  traversalIndex += 1;
-  renderTraversal();
-  message.textContent = `${modeLabels[mode]}遍歷第 ${traversalIndex} / ${traversalOrder.length} 步：${node.value}。`;
-  if (traversalIndex === traversalOrder.length) message.textContent += ' 遍歷完成。';
-  message.className = 'message success';
-  updateProgress();
+  showFrame(frameIndex + 1);
+  if (frameIndex >= frames.length - 1) stopPlayback();
 }
 
-function resetTraversal() {
-  traversalIndex = 0;
-  if (mode !== 'general') traversalOrder = getTraversal(root, mode);
-  renderTraversal();
-  message.textContent = root ? `已重置${modeLabels[mode]}遍歷；按「下一步」重新開始。` : '請先切回一般模式，建立一棵樹。';
-  message.className = 'message';
-  updateProgress();
+function setTimeline(newFrames) {
+  stopPlayback();
+  frames = newFrames;
+  showFrame(0);
 }
 
-function stopAnimation() {
-  if (animationTimer !== null) window.clearTimeout(animationTimer);
-  animationTimer = null;
-  animationRunning = false;
-  animationButton.setAttribute('aria-pressed', 'false');
-  animationButtonLabel.textContent = '▶　播放演化動畫';
-  animationButton.classList.remove('running');
-}
-
-function animationStep() {
-  if (!animationRunning) return;
-  if (mode === 'general') addNextNumber();
-  else visitNextNode();
-
-  const finished = mode === 'general'
-    ? activeValues !== null && insertedCount >= activeValues.length
-    : Boolean(root) && traversalIndex >= traversalOrder.length;
-  if (finished || (mode !== 'general' && !root)) {
-    stopAnimation();
-    return;
-  }
-  animationTimer = window.setTimeout(animationStep, animationInterval);
-}
-
-function startAnimation() {
-  if (mode === 'general') {
-    const parsed = parseSequence(input.value);
-    input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
-    if (parsed.error) {
-      message.textContent = parsed.error;
-      message.className = 'message error';
-      return;
-    }
-    if (!sameSequence(parsed.values)) {
-      activeValues = parsed.values;
-      insertedCount = 0;
-      root = null;
-      lastInsertedValue = null;
-      traversalOrder = [];
-      traversalIndex = 0;
-      drawTree(null);
-    } else if (insertedCount >= activeValues.length) {
-      insertedCount = 0;
-      root = null;
-      lastInsertedValue = null;
-      drawTree(null);
-    }
-    updateProgress();
-  } else {
-    if (!root) {
-      message.textContent = '請先切回一般模式，插入數字並建立樹。';
-      message.className = 'message error';
-      return;
-    }
-    if (!traversalOrder.length) traversalOrder = getTraversal(root, mode);
-    if (traversalIndex >= traversalOrder.length) {
-      traversalIndex = 0;
-      renderTraversal();
-      updateProgress();
-    }
-  }
-
-  animationRunning = true;
-  animationButton.setAttribute('aria-pressed', 'true');
-  animationButtonLabel.textContent = '■　停止動畫';
-  animationButton.classList.add('running');
-  svg.classList.add('stable-tree');
-  message.textContent = mode === 'general' ? '樹正在依序插入數字…' : `${modeLabels[mode]}遍歷動畫進行中…`;
-  message.className = 'message';
-  animationTimer = window.setTimeout(animationStep, animationInterval);
-}
-
-function updateAnimationSpeed() {
-  animationInterval = Number(animationSpeed.value);
-  animationSpeedValue.value = `${(animationInterval / 1000).toFixed(1)} 秒／步`;
-  animationSpeedValue.textContent = animationSpeedValue.value;
-  if (animationRunning && animationTimer !== null) {
-    window.clearTimeout(animationTimer);
-    animationTimer = window.setTimeout(animationStep, animationInterval);
-  }
-}
-
-function stepForward() {
-  if (animationRunning) stopAnimation();
-  if (mode === 'general') addNextNumber();
-  else visitNextNode();
-}
-
-animationButton.addEventListener('click', () => {
-  if (animationRunning) {
-    stopAnimation();
-    message.textContent = '演化動畫已停止。';
-    message.className = 'message';
-  } else startAnimation();
-});
-animationSpeed.addEventListener('input', updateAnimationSpeed);
-addNumberButton.addEventListener('click', addCustomNumber);
-newNumberInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') addCustomNumber();
-});
-nextButton.addEventListener('click', stepForward);
-resetButton.addEventListener('click', () => {
-  stopAnimation();
-  if (mode === 'general') resetTree();
-  else resetTraversal();
-});
-modeButtons.forEach((button) => button.addEventListener('click', () => {
-  stopAnimation();
-  changeMode(button.dataset.mode);
-}));
-exampleButton.addEventListener('click', () => {
-  stopAnimation();
-  input.value = example.join(', ');
-  if (mode !== 'general') changeMode('general');
-  resetTree();
-  message.textContent = '已載入範例數列，按「下一數字」開始插入。';
-});
-input.addEventListener('input', () => {
-  if (animationRunning) stopAnimation();
+function buildHeap() {
   const parsed = parseSequence(input.value);
   input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
-  if (activeValues) {
-    if (parsed.error || !sameSequence(parsed.values)) {
-      resetTree();
-      input.setAttribute('aria-invalid', String(Boolean(parsed.error)));
-      message.textContent = parsed.error || (mode === 'general'
-        ? '數列已變更，按「下一數字」從第一個數字開始。'
-        : '數列已變更；請切回一般模式重新建立樹。');
-      message.className = parsed.error ? 'message error' : 'message';
-      return;
-    }
+  if (parsed.error) {
+    setMessage(parsed.error, 'error');
+    return;
   }
-  updateProgress();
-  if (message.classList.contains('error') && !parsed.error) {
-    message.textContent = '輸入已修正，按「下一數字」繼續。';
-    message.className = 'message';
-  }
-});
-input.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') stepForward();
-});
-window.addEventListener('resize', () => {
-  if (mode === 'general') drawTree(root);
-  else renderTraversal();
-});
+  poppedValues = [];
+  const working = [];
+  const newFrames = [];
+  addFrame(newFrames, working, [], '準備開始：依輸入順序把數字放入完全二元樹。');
+  parsed.values.forEach((value) => traceInsert(working, value, newFrames));
+  setTimeline(newFrames);
+}
 
-drawTree(null);
-updateModeControls();
-updateProgress();
-updateAnimationSpeed();
+function addNumber() {
+  const raw = newNumberInput.value.trim();
+  if (!/^[+-]?\d+$/.test(raw)) {
+    setMessage('請輸入一個有效的整數。', 'error');
+    newNumberInput.focus();
+    return;
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) {
+    setMessage('這個數字超出可安全處理的整數範圍。', 'error');
+    newNumberInput.focus();
+    return;
+  }
+  if (heap.includes(value)) {
+    setMessage(`數字 ${value} 已在堆中，請輸入不重複的數字。`, 'error');
+    newNumberInput.focus();
+    return;
+  }
+  if (heap.length >= MAX_NODES) {
+    setMessage(`最多顯示 ${MAX_NODES} 個節點，請先取出最大值或清空。`, 'error');
+    return;
+  }
+  const working = [...heap];
+  const newFrames = [];
+  addFrame(newFrames, working, [], `準備插入 ${value}。`);
+  traceInsert(working, value, newFrames);
+  setTimeline(newFrames);
+  newNumberInput.value = '';
+}
+
+function removeMax() {
+  if (!heap.length) return;
+  const working = [...heap];
+  const history = [...poppedValues];
+  const newFrames = [];
+  addFrame(newFrames, working, [], '取出前先檢查目前排列是否符合最大堆。', history);
+  if (isMaxHeap(working)) {
+    addFrame(newFrames, working, [], `排列已符合最大堆，根節點 ${working[0]} 是最大值。`, history);
+  } else {
+    traceBuildMaxHeap(working, newFrames);
+  }
+  tracePop(working, newFrames, history);
+  setTimeline(newFrames);
+}
+
+function reset() {
+  stopPlayback();
+  frames = [];
+  frameIndex = 0;
+  heap = [];
+  poppedValues = [];
+  highlighted = new Set();
+  input.setAttribute('aria-invalid', 'false');
+  drawHeap();
+  updatePlaybackControls();
+  setMessage('已清空最大堆；可以建立數列或插入一個數字。');
+}
+
+function setMessage(text, kind = '') {
+  message.textContent = text;
+  message.className = `message${kind ? ` ${kind}` : ''}`;
+}
+
+buildButton.addEventListener('click', buildHeap);
+addButton.addEventListener('click', addNumber);
+newNumberInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') addNumber();
+});
+popButton.addEventListener('click', removeMax);
+previousButton.addEventListener('click', () => showFrame(frameIndex - 1));
+nextButton.addEventListener('click', () => showFrame(frameIndex + 1));
+playButton.addEventListener('click', () => {
+  if (playTimer) {
+    stopPlayback();
+    return;
+  }
+  if (frameIndex >= frames.length - 1) return;
+  previousButton.disabled = true;
+  nextButton.disabled = true;
+  playTimer = window.setInterval(playNext, PLAY_INTERVAL);
+  updatePlaybackControls();
+});
+resetButton.addEventListener('click', reset);
+exampleButton.addEventListener('click', () => {
+  input.value = '48, 25, 72, 12, 36, 60, 90';
+  buildHeap();
+});
+input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
+window.addEventListener('resize', drawHeap);
+
+drawHeap();
+updatePlaybackControls();
