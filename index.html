@@ -6,20 +6,21 @@
   <meta name="theme-color" content="#f5f1e8">
   <meta name="description" content="輸入不重複數列，觀察二元搜尋樹如何依序建立。">
   <title>二元搜尋樹｜資料結構互動展示</title>
-  <link rel="stylesheet" href="style.css?v=animation-3">
+  <link rel="stylesheet" href="style.css?v=rubric-1">
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
       <a class="brand" href="#top" aria-label="回到首頁"><span class="brand-mark">BST</span><span>資料結構實驗室<small>DATA STRUCTURES · 01</small></span></a>
       <span class="top-label"><i></i> INTERACTIVE TREE</span>
+      <nav class="section-nav" aria-label="頁面導覽"><a href="#workspace">互動操作</a><a href="#learning">原理與心得</a></nav>
     </header>
 
     <section class="intro" id="top">
       <div class="intro-copy">
         <p class="eyebrow">BINARY SEARCH TREE / 二元搜尋樹</p>
         <h1>數字落下，<br><em>樹就長出來。</em></h1>
-        <p class="lede">依照輸入順序逐一插入數字。每個數字都沿著比較結果找到唯一的位置，組成一棵二元搜尋樹。</p>
+        <p class="lede">逐一插入、搜尋、刪除節點，再切換四種走訪，看懂比較路徑如何決定樹形與輸出順序。</p>
       </div>
       <div class="rule-card" aria-label="二元搜尋樹規則">
         <div class="rule-title"><span class="rule-icon">↙</span><span>每個節點最多兩個子節點</span></div>
@@ -28,10 +29,10 @@
       </div>
     </section>
 
-    <section class="workspace" aria-label="二元搜尋樹建置器">
+    <section class="workspace" id="workspace" aria-label="二元搜尋樹建置器">
       <aside class="control-panel">
         <div class="panel-heading"><div><p class="eyebrow">01 / INPUT</p><h2>輸入數列</h2></div><span class="step-badge">STEP</span></div>
-        <p class="panel-copy">先輸入一串不重複的整數，再選擇操作模式。</p>
+        <p class="panel-copy">輸入不重複整數建立唯一樹形，再試著逐步走訪、搜尋與刪除。</p>
         <div class="mode-control">
           <p class="mode-caption">操作模式</p>
           <div class="mode-switch" role="group" aria-label="切換樹操作模式">
@@ -39,6 +40,7 @@
             <button class="mode-button" type="button" data-mode="preorder" aria-pressed="false">前序</button>
             <button class="mode-button" type="button" data-mode="inorder" aria-pressed="false">中序</button>
             <button class="mode-button" type="button" data-mode="postorder" aria-pressed="false">後序</button>
+            <button class="mode-button" type="button" data-mode="levelorder" aria-pressed="false">層序</button>
           </div>
           <p class="mode-note" id="modeNote">逐個插入數字，建立二元搜尋樹。</p>
         </div>
@@ -63,6 +65,12 @@
             <button id="addNumberButton" type="button">新增</button>
           </div>
         </div>
+        <div class="operation-control">
+          <label for="operationValueInput">搜尋或刪除節點</label>
+          <div class="operation-row"><input id="operationValueInput" type="text" inputmode="numeric" placeholder="輸入要操作的數字" aria-label="要搜尋或刪除的整數"></div>
+          <div class="operation-actions"><button id="searchValueButton" type="button">搜尋</button><button id="deleteValueButton" type="button">刪除</button></div>
+          <small>先建立樹，再操作其中的數字。</small>
+        </div>
         <p id="message" class="message" aria-live="polite">按「下一數字」逐步插入，一次新增一個節點。</p>
         <div class="panel-divider"></div>
         <div class="concept-note"><span class="note-mark">i</span><p><b>插入順序會影響樹形</b><br>同一組數字若順序不同，長出的樹也可能不同。此處依照你輸入的順序，只建立一棵樹。</p></div>
@@ -77,12 +85,77 @@
           <svg id="treeSvg" role="img" aria-label="二元搜尋樹圖形" focusable="false"></svg>
           <div id="emptyState" class="empty-state" hidden><span class="empty-glyph">⌘</span><b>輸入數列，讓樹開始生長</b><small>節點會按照由上而下、由左至右的結構排列</small></div>
         </div>
+        <section class="traversal-output" id="traversalOutputPanel" aria-label="走訪輸出" hidden>
+          <div class="traversal-output-heading"><b>走訪輸出</b><span id="traversalProgress">尚未開始</span></div>
+          <ol id="traversalOutput" aria-live="polite"></ol>
+          <button id="previousTraversalButton" type="button" disabled>← 上一步</button>
+        </section>
         <div class="tree-legend"><span><i class="legend-node"></i>節點</span><span><i class="legend-line"></i>父子連結</span><span><i class="legend-order">1</i>左上角數字＝造訪順序</span><span class="legend-caption">同一數列順序 → 唯一棵樹</span></div>
       </section>
     </section>
 
+    <section class="learning-section" id="learning" aria-labelledby="learningTitle">
+      <div class="learning-heading"><div><p class="eyebrow">03 / PRINCIPLES & REFLECTION</p><h2 id="learningTitle">從比較到走訪：二元搜尋樹的原理</h2></div><p>先用範例建立樹，再切換走訪方式，對照輸出與節點編號。</p></div>
+      <div class="learning-grid">
+        <article class="learning-card"><span class="card-index">01</span><h3>BST 的大小規則</h3><p>對每個節點都成立：左子樹中的值全部小於節點，右子樹中的值全部大於節點。本頁不收重複值。插入時從根節點比較，走到空位才建立新節點，因此數字的位置由比較路徑唯一決定。</p></article>
+        <article class="learning-card"><span class="card-index">02</span><h3>搜尋與刪除</h3><p>搜尋沿著和插入相同的路徑前進；相等就是找到，走到空位就是不存在。刪除分三種：葉節點直接移除、單一子節點由孩子接替、兩個子節點以右子樹最小值（中序後繼）接替，再移除後繼原位置。</p></article>
+        <article class="learning-card"><span class="card-index">03</span><h3>四種走訪口訣</h3><ul><li>前序：根 → 左 → 右（根先輸出）</li><li>中序：左 → 根 → 右（BST 會由小到大）</li><li>後序：左 → 右 → 根（根最後輸出）</li><li>層序：由上往下、每層由左到右</li></ul></article>
+        <article class="learning-card"><span class="card-index">04</span><h3>效率取決於樹高</h3><p>插入、搜尋、刪除都沿著一條根到節點的路徑，時間為 <code>O(h)</code>，其中 <code>h</code> 是樹高。樹形均衡時約為 <code>O(log n)</code>；若依序插入已排序數列，樹可能歪成長鏈，最壞會到 <code>O(n)</code>。</p></article>
+      </div>
+      <div class="worked-example"><div><p class="eyebrow">WORKED EXAMPLE</p><h3>範例數列的四種輸出</h3><p>插入 48, 25, 72, 12, 36, 60, 90, 30, 42 後，四種走法會產生不同順序。</p></div><dl><div><dt>前序</dt><dd>48, 25, 12, 36, 30, 42, 72, 60, 90</dd></div><div><dt>中序</dt><dd>12, 25, 30, 36, 42, 48, 60, 72, 90</dd></div><div><dt>後序</dt><dd>12, 30, 42, 36, 25, 60, 90, 72, 48</dd></div><div><dt>層序</dt><dd>48, 25, 72, 12, 36, 60, 90, 30, 42</dd></div></dl></div>
+      <details class="code-explanation"><summary>核心 C++ 程式：插入、搜尋、刪除與四種走訪</summary><pre><code>#include &lt;iostream&gt;
+#include &lt;queue&gt;
+using namespace std;
+
+struct Node { int value; Node *left, *right; };
+void visit(Node* t) { cout &lt;&lt; t-&gt;value &lt;&lt; ' '; }
+
+Node* insert(Node* root, int x) {
+    if (!root) return new Node{x, nullptr, nullptr};
+    if (x &lt; root-&gt;value) root-&gt;left = insert(root-&gt;left, x);
+    else if (x &gt; root-&gt;value) root-&gt;right = insert(root-&gt;right, x);
+    return root; // 相等時不重複插入
+}
+
+bool search(Node* t, int x) {
+    if (!t) return false;
+    if (x == t-&gt;value) return true;
+    return x &lt; t-&gt;value ? search(t-&gt;left, x) : search(t-&gt;right, x);
+}
+
+Node* removeNode(Node* t, int x) {
+    if (!t) return nullptr;
+    if (x &lt; t-&gt;value) t-&gt;left = removeNode(t-&gt;left, x);
+    else if (x &gt; t-&gt;value) t-&gt;right = removeNode(t-&gt;right, x);
+    else {
+        if (!t-&gt;left) { Node* r = t-&gt;right; delete t; return r; }
+        if (!t-&gt;right) { Node* l = t-&gt;left; delete t; return l; }
+        Node* s = t-&gt;right;
+        while (s-&gt;left) s = s-&gt;left; // 右子樹最小值：中序後繼
+        t-&gt;value = s-&gt;value;
+        t-&gt;right = removeNode(t-&gt;right, s-&gt;value);
+    }
+    return t;
+}
+
+void preorder(Node* t)  { if (!t) return; visit(t); preorder(t-&gt;left); preorder(t-&gt;right); }
+void inorder(Node* t)   { if (!t) return; inorder(t-&gt;left); visit(t); inorder(t-&gt;right); }
+void postorder(Node* t) { if (!t) return; postorder(t-&gt;left); postorder(t-&gt;right); visit(t); }
+
+void levelOrder(Node* root) {
+    queue&lt;Node*&gt; q; if (root) q.push(root);
+    while (!q.empty()) {
+        Node* t = q.front(); q.pop(); visit(t);
+        if (t-&gt;left) q.push(t-&gt;left);
+        if (t-&gt;right) q.push(t-&gt;right);
+    }
+}</code></pre><p class="code-note">前三種走訪的程式只有 visit 位置不同，遞迴堆疊會記住尚未完成的節點；層序改用先進先出的佇列，確保同一層先走完。</p></details>
+      <blockquote class="reflection"><span class="eyebrow">實作心得</span><p>操作後我發現，二元搜尋樹的形狀不只看有哪些數字，也受插入順序影響。中序走訪能把 BST 輸出成排序結果；但普通 BST 不會自動平衡，遇到有序輸入時可能退化成長鏈。透過搜尋路徑、刪除情況和四種走訪的對照，我更能看出每一步是在維持哪個規則，而不只是背樹的圖形。</p></blockquote>
+    </section>
+
     <footer><span>COMPARE <b>→</b> PLACE <b>→</b> CONNECT</span><span>二元搜尋樹 · Binary Search Tree</span><span>資料結構練習 <i>✳</i></span></footer>
   </main>
-  <script src="script.js?v=animation-3"></script>
+  <script src="script.js?v=rubric-1"></script>
 </body>
 </html>
+
