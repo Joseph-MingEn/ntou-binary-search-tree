@@ -4,6 +4,9 @@ const resetButton = document.querySelector('#resetButton');
 const exampleButton = document.querySelector('#exampleButton');
 const newNumberInput = document.querySelector('#newNumberInput');
 const addNumberButton = document.querySelector('#addNumberButton');
+const operationValueInput = document.querySelector('#operationValueInput');
+const searchValueButton = document.querySelector('#searchValueButton');
+const deleteValueButton = document.querySelector('#deleteValueButton');
 const animationButton = document.querySelector('#animationButton');
 const animationButtonLabel = document.querySelector('#animationButtonLabel');
 const animationSpeed = document.querySelector('#animationSpeed');
@@ -18,6 +21,10 @@ const nextButtonLabel = document.querySelector('#nextButtonLabel');
 const nodeCount = document.querySelector('#nodeCount');
 const treeHeight = document.querySelector('#treeHeight');
 const stepCount = document.querySelector('#stepCount');
+const traversalOutputPanel = document.querySelector('#traversalOutputPanel');
+const traversalOutput = document.querySelector('#traversalOutput');
+const traversalProgress = document.querySelector('#traversalProgress');
+const previousTraversalButton = document.querySelector('#previousTraversalButton');
 const example = [48, 25, 72, 12, 36, 60, 90, 30, 42];
 const MAX_NODES = 31;
 const NODE_RADIUS = 24;
@@ -33,7 +40,7 @@ let traversalOrder = [];
 let traversalIndex = 0;
 let animationRunning = false;
 let animationTimer = null;
-const modeLabels = { preorder: '前序', inorder: '中序', postorder: '後序' };
+const modeLabels = { preorder: '前序', inorder: '中序', postorder: '後序', levelorder: '層序' };
 
 function parseSequence(value) {
   const parts = value.trim().split(/[\s,，、]+/).filter(Boolean);
@@ -138,7 +145,7 @@ function drawTree(root, visitedNodes = [], currentNode = null) {
     const classes = ['node'];
     if (node === root) classes.push('root-node');
     if (visited.has(node)) classes.push('visited');
-    if ((mode === 'general' && node.value === lastInsertedValue) || (mode !== 'general' && node === currentNode)) classes.push('current-visit');
+    if (node === currentNode || (mode === 'general' && node.value === lastInsertedValue)) classes.push('current-visit');
     const group = svgElement('g', { class: classes.join(' '), transform: `translate(${cx} ${y})` });
     const title = svgElement('title');
     const visitPosition = traversalOrder.indexOf(node);
@@ -282,6 +289,116 @@ function addCustomNumber() {
   updateProgress();
 }
 
+function syncSequenceToTree() {
+  const values = getTraversal(root, 'preorder').map((node, index) => {
+    node.insertionOrder = index + 1;
+    return node.value;
+  });
+  activeValues = values;
+  insertedCount = values.length;
+  input.value = values.join(', ');
+  lastInsertedValue = null;
+  traversalOrder = [];
+  traversalIndex = 0;
+}
+
+function readOperationValue() {
+  const raw = operationValueInput.value.trim();
+  if (!/^[+-]?\d+$/.test(raw)) return { error: '請輸入一個有效的整數。' };
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) return { error: '這個數字超出可安全處理的整數範圍。' };
+  return { value };
+}
+
+function prepareTreeOperation() {
+  if (animationRunning) stopAnimation();
+  if (mode !== 'general') changeMode('general');
+  if (!root) {
+    message.textContent = '請先建立一棵樹，再搜尋或刪除節點。';
+    message.className = 'message error';
+    return false;
+  }
+  const parsed = readOperationValue();
+  if (parsed.error) {
+    message.textContent = parsed.error;
+    message.className = 'message error';
+    operationValueInput.focus();
+    return false;
+  }
+  return parsed;
+}
+
+function searchValue() {
+  const operation = prepareTreeOperation();
+  if (!operation) return;
+  lastInsertedValue = null;
+  const path = [];
+  let node = root;
+  while (node) {
+    path.push(node);
+    if (operation.value === node.value) break;
+    node = operation.value < node.value ? node.left : node.right;
+  }
+  const found = node !== null;
+  drawTree(root, path, node ?? path[path.length - 1]);
+  message.textContent = found
+    ? `搜尋 ${operation.value}：找到。比較路徑：${path.map((item) => item.value).join(' → ')}。`
+    : `搜尋 ${operation.value}：找不到。比較路徑：${path.map((item) => item.value).join(' → ')}，最後走到空位。`;
+  message.className = found ? 'message success' : 'message';
+}
+
+function removeNode(node, value, path = []) {
+  if (!node) return { node: null, found: false, caseLabel: '', successor: null };
+  path.push(node);
+  if (value < node.value) {
+    const result = removeNode(node.left, value, path);
+    node.left = result.node;
+    return { ...result, node };
+  }
+  if (value > node.value) {
+    const result = removeNode(node.right, value, path);
+    node.right = result.node;
+    return { ...result, node };
+  }
+  if (!node.left && !node.right) return { node: null, found: true, caseLabel: '葉節點：直接移除', successor: null };
+  if (!node.left) return { node: node.right, found: true, caseLabel: '單一右子節點：由右孩子接替', successor: null };
+  if (!node.right) return { node: node.left, found: true, caseLabel: '單一左子節點：由左孩子接替', successor: null };
+
+  let successorParent = node;
+  let successor = node.right;
+  while (successor.left) {
+    path.push(successor);
+    successorParent = successor;
+    successor = successor.left;
+  }
+  path.push(successor);
+  node.value = successor.value;
+  node.insertionOrder = successor.insertionOrder;
+  if (successorParent === node) successorParent.right = successor.right;
+  else successorParent.left = successor.right;
+  return { node, found: true, caseLabel: '雙子節點：以中序後繼接替', successor: successor.value };
+}
+
+function deleteValue() {
+  const operation = prepareTreeOperation();
+  if (!operation) return;
+  const path = [];
+  const result = removeNode(root, operation.value, path);
+  if (!result.found) {
+    drawTree(root, path, path[path.length - 1] ?? null);
+    message.textContent = `刪除 ${operation.value} 失敗：樹中沒有這個數字。比較路徑：${path.map((item) => item.value).join(' → ')}。`;
+    message.className = 'message error';
+    return;
+  }
+  root = result.node;
+  syncSequenceToTree();
+  drawTree(root, path);
+  const successorNote = result.successor === null ? '' : `；中序後繼 ${result.successor} 接替原位置`;
+  message.textContent = `已刪除 ${operation.value}。${result.caseLabel}${successorNote}。數列已同步為可重建目前樹形的前序順序。`;
+  message.className = 'message success';
+  updateProgress();
+}
+
 function resetTree() {
   root = null;
   activeValues = null;
@@ -289,6 +406,7 @@ function resetTree() {
   lastInsertedValue = null;
   traversalOrder = [];
   traversalIndex = 0;
+  traversalOutput.replaceChildren();
   svg.classList.remove('stable-tree');
   input.setAttribute('aria-invalid', 'false');
   drawTree(null);
@@ -301,6 +419,16 @@ function resetTree() {
 
 function getTraversal(node, order, values = []) {
   if (!node) return values;
+  if (order === 'levelorder') {
+    const queue = [node];
+    for (let index = 0; index < queue.length; index += 1) {
+      const current = queue[index];
+      values.push(current);
+      if (current.left) queue.push(current.left);
+      if (current.right) queue.push(current.right);
+    }
+    return values;
+  }
   if (order === 'preorder') values.push(node);
   getTraversal(node.left, order, values);
   if (order === 'inorder') values.push(node);
@@ -312,6 +440,16 @@ function getTraversal(node, order, values = []) {
 function renderTraversal() {
   const visited = traversalOrder.slice(0, traversalIndex);
   drawTree(root, visited, visited[visited.length - 1] ?? null);
+  traversalOutput.replaceChildren();
+  visited.forEach((node, index) => {
+    const item = document.createElement('li');
+    if (index === visited.length - 1) item.classList.add('current');
+    item.textContent = String(node.value);
+    item.setAttribute('aria-label', `${modeLabels[mode]}第 ${index + 1} 個：${node.value}`);
+    traversalOutput.append(item);
+  });
+  traversalProgress.textContent = `${traversalIndex} / ${traversalOrder.length} 已輸出`;
+  previousTraversalButton.disabled = traversalIndex === 0;
 }
 
 function updateModeControls() {
@@ -321,6 +459,10 @@ function updateModeControls() {
     button.setAttribute('aria-pressed', String(selected));
   });
   const isTraversal = mode !== 'general';
+  traversalOutputPanel.hidden = !isTraversal;
+  previousTraversalButton.hidden = !isTraversal;
+  resetButton.textContent = isTraversal ? '重來' : '重置';
+  if (!isTraversal) traversalOutput.replaceChildren();
   nextButtonLabel.textContent = isTraversal ? '下一步' : '下一數字';
   modeNote.textContent = isTraversal
     ? `${modeLabels[mode]}遍歷：依序標示拜訪到的節點。`
@@ -359,6 +501,15 @@ function visitNextNode() {
   message.textContent = `${modeLabels[mode]}遍歷第 ${traversalIndex} / ${traversalOrder.length} 步：${node.value}。`;
   if (traversalIndex === traversalOrder.length) message.textContent += ' 遍歷完成。';
   message.className = 'message success';
+  updateProgress();
+}
+
+function visitPreviousNode() {
+  if (!traversalOrder.length || traversalIndex === 0) return;
+  traversalIndex -= 1;
+  renderTraversal();
+  message.textContent = `${modeLabels[mode]}遍歷退回第 ${traversalIndex} / ${traversalOrder.length} 步。`;
+  message.className = 'message';
   updateProgress();
 }
 
@@ -468,10 +619,19 @@ animationButton.addEventListener('click', () => {
 });
 animationSpeed.addEventListener('input', updateAnimationSpeed);
 addNumberButton.addEventListener('click', addCustomNumber);
+searchValueButton.addEventListener('click', searchValue);
+deleteValueButton.addEventListener('click', deleteValue);
 newNumberInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') addCustomNumber();
 });
+operationValueInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') searchValue();
+});
 nextButton.addEventListener('click', stepForward);
+previousTraversalButton.addEventListener('click', () => {
+  if (animationRunning) stopAnimation();
+  visitPreviousNode();
+});
 resetButton.addEventListener('click', () => {
   stopAnimation();
   if (mode === 'general') resetTree();
@@ -521,3 +681,4 @@ drawTree(null);
 updateModeControls();
 updateProgress();
 updateAnimationSpeed();
+
